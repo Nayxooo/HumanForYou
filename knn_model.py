@@ -1,14 +1,16 @@
+# Required Libraries
 import pandas as pd
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold, cross_val_score
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import (
     roc_auc_score, roc_curve, confusion_matrix, classification_report, accuracy_score
 )
-from sklearn.tree import plot_tree
-import os
+from sklearn.preprocessing import StandardScaler
+from imblearn.over_sampling import SMOTE
 
 # Seaborn Style
 sns.set(style="whitegrid", palette="muted", font_scale=1.2)
@@ -16,7 +18,7 @@ sns.set(style="whitegrid", palette="muted", font_scale=1.2)
 # ============================
 # STEP 1: SETUP OUTPUT FOLDER
 # ============================
-output_folder = "random_forest_stats"  # Subfolder for storing stats
+output_folder = "knn_stats"
 if not os.path.exists(output_folder):
     os.makedirs(output_folder)
 
@@ -30,8 +32,6 @@ data = pd.read_csv("processed_data_final.csv")
 # STEP 3: PREPARE THE DATA
 # ============================
 print("Preparing the dataset...")
-
-# Features and target
 X = data.drop(columns=['Attrition_1'])  # Drop target column
 y = data['Attrition_1']  # Target column
 
@@ -40,56 +40,54 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
+# Standardize features (important for KNN)
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
 # ============================
-# STEP 4: GRID SEARCH FOR BEST PARAMETERS
+# STEP 4: BALANCE THE DATASET
+# ============================
+print("Balancing the dataset with SMOTE...")
+smote = SMOTE(random_state=42)
+X_train_balanced, y_train_balanced = smote.fit_resample(X_train_scaled, y_train)
+
+# ============================
+# STEP 5: GRID SEARCH FOR BEST PARAMETERS
 # ============================
 print("Performing hyperparameter tuning using GridSearchCV...")
-
 param_grid = {
-    'n_estimators': [100, 200, 300],
-    'max_depth': [10, 20, 30, None],
-    'min_samples_split': [2, 5, 10],
-    'min_samples_leaf': [1, 2, 4],
-    'max_features': ['sqrt', 'log2', None],
+    'n_neighbors': list(range(5, 50, 5)),  # Larger range for neighbors
+    'weights': ['uniform', 'distance'],
+    'metric': ['euclidean', 'manhattan']
 }
 
-rf_model = RandomForestClassifier(random_state=42)
+knn_model = KNeighborsClassifier()
 
-# Cross-validation
-cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
 
 grid_search = GridSearchCV(
-    estimator=rf_model,
+    estimator=knn_model,
     param_grid=param_grid,
     cv=cv,
     scoring='roc_auc',
     n_jobs=-1,
     verbose=2
 )
+grid_search.fit(X_train_balanced, y_train_balanced)
 
-grid_search.fit(X_train, y_train)
-
-# Best parameters and estimator
 print("Best Parameters Found:", grid_search.best_params_)
-best_rf_model = grid_search.best_estimator_
-
-# ============================
-# STEP 5: CROSS-VALIDATION EVALUATION
-# ============================
-print("Evaluating model using cross-validation...")
-cv_scores = cross_val_score(best_rf_model, X_train, y_train, cv=cv, scoring='roc_auc')
-print(f"Cross-Validation ROC-AUC Scores: {cv_scores}")
-print(f"Mean ROC-AUC Score: {np.mean(cv_scores):.4f}")
+best_knn_model = grid_search.best_estimator_
 
 # ============================
 # STEP 6: TRAIN FINAL MODEL
 # ============================
-print("Training Random Forest with optimized hyperparameters...")
-best_rf_model.fit(X_train, y_train)
+print("Training KNN model with optimized hyperparameters...")
+best_knn_model.fit(X_train_balanced, y_train_balanced)
 
 # Predictions
-y_pred = best_rf_model.predict(X_test)
-y_pred_proba = best_rf_model.predict_proba(X_test)[:, 1]
+y_pred = best_knn_model.predict(X_test_scaled)
+y_pred_proba = best_knn_model.predict_proba(X_test_scaled)[:, 1]
 
 # ============================
 # STEP 7: EVALUATE THE MODEL
@@ -132,56 +130,38 @@ accuracy = accuracy_score(y_test, y_pred)
 print(f"Test Set Accuracy: {accuracy:.4f}")
 print(f"Test Set ROC-AUC Score: {roc_auc:.4f}")
 
-# Save results to CSV
-results_df = pd.DataFrame({
-    'Actual': y_test,
-    'Predicted': y_pred,
-    'Probability': y_pred_proba
-})
-results_df.to_csv(os.path.join(output_folder, "random_forest_results.csv"), index=False)
-
 # ============================
-# STEP 8: FEATURE IMPORTANCE
+# STEP 8: LOSS AND ACCURACY GRAPHS
 # ============================
-print("Plotting Feature Importances...")
-feature_importances = best_rf_model.feature_importances_
-feature_names = X.columns
-
-# Sort features by importance
-importance_df = pd.DataFrame({
-    'Feature': feature_names,
-    'Importance': feature_importances
-}).sort_values(by='Importance', ascending=False).head(10)
-
-# Plot the top 10 features
-plt.figure(figsize=(10, 6))
-sns.barplot(x='Importance', y='Feature', data=importance_df, palette="viridis")
-plt.title("Top 10 Most Important Features")
-plt.xlabel("Feature Importance")
-plt.ylabel("Features")
-plt.tight_layout()
-plt.savefig(os.path.join(output_folder, "top_10_features.png"))
-plt.show()
-
-# ============================
-# STEP 9: ACCURACY AND LOSS GRAPH
-# ============================
+print("Generating Loss and Accuracy Graphs...")
 train_losses = []
 val_losses = []
+train_accuracies = []
+val_accuracies = []
 
-for train_idx, val_idx in cv.split(X_train, y_train):
-    X_cv_train, X_cv_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
-    y_cv_train, y_cv_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
-    best_rf_model.fit(X_cv_train, y_cv_train)
-    train_loss = 1 - best_rf_model.score(X_cv_train, y_cv_train)
-    val_loss = 1 - best_rf_model.score(X_cv_val, y_cv_val)
+for train_idx, val_idx in cv.split(X_train_balanced, y_train_balanced):
+    X_cv_train, X_cv_val = X_train_balanced[train_idx], X_train_balanced[val_idx]
+    y_cv_train, y_cv_val = y_train_balanced[train_idx], y_train_balanced[val_idx]
+
+    # Fit model
+    best_knn_model.fit(X_cv_train, y_cv_train)
+
+    # Compute loss and accuracy
+    train_loss = 1 - best_knn_model.score(X_cv_train, y_cv_train)
+    val_loss = 1 - best_knn_model.score(X_cv_val, y_cv_val)
     train_losses.append(train_loss)
     val_losses.append(val_loss)
 
+    train_acc = best_knn_model.score(X_cv_train, y_cv_train)
+    val_acc = best_knn_model.score(X_cv_val, y_cv_val)
+    train_accuracies.append(train_acc)
+    val_accuracies.append(val_acc)
+
+# Plot Loss Graph
 plt.figure(figsize=(10, 6))
 plt.plot(range(1, len(train_losses)+1), train_losses, marker='o', label='Training Loss')
 plt.plot(range(1, len(val_losses)+1), val_losses, marker='o', label='Validation Loss')
-plt.title("Model Loss Progression")
+plt.title("Model Loss Progression (KNN)")
 plt.xlabel("Cross-Validation Fold")
 plt.ylabel("Loss (1 - Accuracy)")
 plt.grid(True)
@@ -190,17 +170,21 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_folder, "loss_progression.png"))
 plt.show()
 
-# ============================
-# STEP 10: TREE VISUALIZATION
-# ============================
-plt.figure(figsize=(25, 15))
-plot_tree(best_rf_model.estimators_[0], feature_names=X.columns, filled=True, rounded=True)
-plt.title("Random Forest Decision Tree")
-plt.savefig(os.path.join(output_folder, "decision_tree.png"))
+# Plot Accuracy Graph
+plt.figure(figsize=(10, 6))
+plt.plot(range(1, len(train_accuracies)+1), train_accuracies, marker='o', label='Training Accuracy')
+plt.plot(range(1, len(val_accuracies)+1), val_accuracies, marker='o', label='Validation Accuracy')
+plt.title("Model Accuracy Progression (KNN)")
+plt.xlabel("Cross-Validation Fold")
+plt.ylabel("Accuracy (0-1)")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.savefig(os.path.join(output_folder, "accuracy_progression.png"))
 plt.show()
 
 # ============================
 # COMPLETION MESSAGE
 # ============================
-print("Model training and evaluation complete.")
-print(f"Results (graphs, CSV, and stats) saved in the folder: {output_folder}")
+print("KNN model training and evaluation complete.")
+print(f"Results (graphs, stats, and CSV) saved in the folder: {output_folder}")
