@@ -10,13 +10,12 @@ from sklearn.metrics import (
 from sklearn.tree import plot_tree
 import os
 
-# Seaborn Style
 sns.set(style="whitegrid", palette="muted", font_scale=1.2)
 
 # ============================
 # STEP 1: SETUP OUTPUT FOLDER
 # ============================
-output_folder = "random_forest_stats"  # Subfolder for storing stats
+output_folder = "random_forest_stats"  
 if not os.path.exists(output_folder):
     os.makedirs(output_folder)
 
@@ -31,11 +30,9 @@ data = pd.read_csv("processed_data_final.csv")
 # ============================
 print("Preparing the dataset...")
 
-# Features and target
-X = data.drop(columns=['Attrition_1'])  # Drop target column
-y = data['Attrition_1']  # Target column
+X = data.drop(columns=['Attrition_1'])  
+y = data['Attrition_1']
 
-# Train-test split
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
@@ -55,7 +52,6 @@ param_grid = {
 
 rf_model = RandomForestClassifier(random_state=42)
 
-# Cross-validation
 cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
 grid_search = GridSearchCV(
@@ -69,7 +65,6 @@ grid_search = GridSearchCV(
 
 grid_search.fit(X_train, y_train)
 
-# Best parameters and estimator
 print("Best Parameters Found:", grid_search.best_params_)
 best_rf_model = grid_search.best_estimator_
 
@@ -87,14 +82,12 @@ print(f"Mean ROC-AUC Score: {np.mean(cv_scores):.4f}")
 print("Training Random Forest with optimized hyperparameters...")
 best_rf_model.fit(X_train, y_train)
 
-# Predictions
 y_pred = best_rf_model.predict(X_test)
 y_pred_proba = best_rf_model.predict_proba(X_test)[:, 1]
 
 # ============================
 # STEP 7: EVALUATE THE MODEL
 # ============================
-# ROC Curve
 print("Generating ROC Curve...")
 fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
 roc_auc = roc_auc_score(y_test, y_pred_proba)
@@ -111,7 +104,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_folder, "roc_curve.png"))
 plt.show()
 
-# Confusion Matrix
 print("Generating Confusion Matrix...")
 conf_matrix = confusion_matrix(y_test, y_pred)
 plt.figure(figsize=(8, 6))
@@ -123,16 +115,13 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_folder, "confusion_matrix.png"))
 plt.show()
 
-# Classification Report
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred))
 
-# Test Set Accuracy
 accuracy = accuracy_score(y_test, y_pred)
 print(f"Test Set Accuracy: {accuracy:.4f}")
 print(f"Test Set ROC-AUC Score: {roc_auc:.4f}")
 
-# Save results to CSV
 results_df = pd.DataFrame({
     'Actual': y_test,
     'Predicted': y_pred,
@@ -147,13 +136,11 @@ print("Plotting Feature Importances...")
 feature_importances = best_rf_model.feature_importances_
 feature_names = X.columns
 
-# Sort features by importance
 importance_df = pd.DataFrame({
     'Feature': feature_names,
     'Importance': feature_importances
 }).sort_values(by='Importance', ascending=False).head(10)
 
-# Plot the top 10 features
 plt.figure(figsize=(10, 6))
 sns.barplot(x='Importance', y='Feature', data=importance_df, palette="viridis")
 plt.title("Top 10 Most Important Features")

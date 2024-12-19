@@ -1,4 +1,3 @@
-# Required Libraries
 import pandas as pd
 import numpy as np
 import os
@@ -12,7 +11,6 @@ from sklearn.metrics import (
 from sklearn.preprocessing import StandardScaler
 from imblearn.over_sampling import SMOTE
 
-# Seaborn Style
 sns.set(style="whitegrid", palette="muted", font_scale=1.2)
 
 # ============================
@@ -32,15 +30,13 @@ data = pd.read_csv("processed_data_final.csv")
 # STEP 3: PREPARE THE DATA
 # ============================
 print("Preparing the dataset...")
-X = data.drop(columns=['Attrition_1'])  # Drop target column
-y = data['Attrition_1']  # Target column
+X = data.drop(columns=['Attrition_1'])  
+y = data['Attrition_1'] 
 
-# Train-test split
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
 
-# Standardize features (important for KNN)
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
@@ -57,7 +53,7 @@ X_train_balanced, y_train_balanced = smote.fit_resample(X_train_scaled, y_train)
 # ============================
 print("Performing hyperparameter tuning using GridSearchCV...")
 param_grid = {
-    'n_neighbors': list(range(5, 50, 5)),  # Larger range for neighbors
+    'n_neighbors': list(range(5, 50, 5)),  
     'weights': ['uniform', 'distance'],
     'metric': ['euclidean', 'manhattan']
 }
@@ -85,14 +81,12 @@ best_knn_model = grid_search.best_estimator_
 print("Training KNN model with optimized hyperparameters...")
 best_knn_model.fit(X_train_balanced, y_train_balanced)
 
-# Predictions
 y_pred = best_knn_model.predict(X_test_scaled)
 y_pred_proba = best_knn_model.predict_proba(X_test_scaled)[:, 1]
 
 # ============================
 # STEP 7: EVALUATE THE MODEL
 # ============================
-# ROC Curve
 print("Generating ROC Curve...")
 fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
 roc_auc = roc_auc_score(y_test, y_pred_proba)
@@ -109,7 +103,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_folder, "roc_curve.png"))
 plt.show()
 
-# Confusion Matrix
 print("Generating Confusion Matrix...")
 conf_matrix = confusion_matrix(y_test, y_pred)
 plt.figure(figsize=(8, 6))
@@ -121,11 +114,9 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_folder, "confusion_matrix.png"))
 plt.show()
 
-# Classification Report
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred))
 
-# Test Set Accuracy
 accuracy = accuracy_score(y_test, y_pred)
 print(f"Test Set Accuracy: {accuracy:.4f}")
 print(f"Test Set ROC-AUC Score: {roc_auc:.4f}")
@@ -143,10 +134,8 @@ for train_idx, val_idx in cv.split(X_train_balanced, y_train_balanced):
     X_cv_train, X_cv_val = X_train_balanced[train_idx], X_train_balanced[val_idx]
     y_cv_train, y_cv_val = y_train_balanced[train_idx], y_train_balanced[val_idx]
 
-    # Fit model
     best_knn_model.fit(X_cv_train, y_cv_train)
 
-    # Compute loss and accuracy
     train_loss = 1 - best_knn_model.score(X_cv_train, y_cv_train)
     val_loss = 1 - best_knn_model.score(X_cv_val, y_cv_val)
     train_losses.append(train_loss)
@@ -157,7 +146,6 @@ for train_idx, val_idx in cv.split(X_train_balanced, y_train_balanced):
     train_accuracies.append(train_acc)
     val_accuracies.append(val_acc)
 
-# Plot Loss Graph
 plt.figure(figsize=(10, 6))
 plt.plot(range(1, len(train_losses)+1), train_losses, marker='o', label='Training Loss')
 plt.plot(range(1, len(val_losses)+1), val_losses, marker='o', label='Validation Loss')
@@ -170,7 +158,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_folder, "loss_progression.png"))
 plt.show()
 
-# Plot Accuracy Graph
 plt.figure(figsize=(10, 6))
 plt.plot(range(1, len(train_accuracies)+1), train_accuracies, marker='o', label='Training Accuracy')
 plt.plot(range(1, len(val_accuracies)+1), val_accuracies, marker='o', label='Validation Accuracy')

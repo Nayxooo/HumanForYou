@@ -1,4 +1,3 @@
-# Required Libraries
 import pandas as pd
 import numpy as np
 import os
@@ -11,13 +10,12 @@ from sklearn.metrics import (
 )
 from imblearn.over_sampling import SMOTE
 
-# Seaborn Style
 sns.set(style="whitegrid", palette="muted", font_scale=1.2)
 
 # ============================
 # STEP 1: SETUP OUTPUT FOLDER
 # ============================
-output_folder = "logistic_regression_stats"  # New subfolder for Logistic Regression outputs
+output_folder = "logistic_regression_stats"  
 if not os.path.exists(output_folder):
     os.makedirs(output_folder)
 
@@ -31,10 +29,9 @@ data = pd.read_csv("processed_data_final.csv")
 # STEP 3: PREPARE THE DATA
 # ============================
 print("Preparing the dataset...")
-X = data.drop(columns=['Attrition_1'])  # Drop target column
-y = data['Attrition_1']  # Target column
+X = data.drop(columns=['Attrition_1']) 
+y = data['Attrition_1']  
 
-# Train-test split
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
 )
@@ -52,7 +49,7 @@ X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
 print("Performing hyperparameter tuning using GridSearchCV...")
 param_grid = {
     'C': [0.01, 0.1, 1, 10, 100],
-    'penalty': ['l2'],  # Regularization penalty
+    'penalty': ['l2'], 
     'solver': ['liblinear', 'lbfgs']
 }
 
@@ -84,7 +81,6 @@ y_pred_proba = best_logistic_model.predict_proba(X_test)[:, 1]
 # ============================
 # STEP 7: EVALUATE THE MODEL
 # ============================
-# ROC Curve
 print("Generating ROC Curve...")
 fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
 roc_auc = roc_auc_score(y_test, y_pred_proba)
@@ -101,7 +97,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_folder, "roc_curve.png"))
 plt.show()
 
-# Confusion Matrix
 print("Generating Confusion Matrix...")
 conf_matrix = confusion_matrix(y_test, y_pred)
 plt.figure(figsize=(8, 6))
@@ -113,11 +108,9 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_folder, "confusion_matrix.png"))
 plt.show()
 
-# Classification Report
 print("\nClassification Report:")
 print(classification_report(y_test, y_pred))
 
-# Test Set Accuracy
 accuracy = accuracy_score(y_test, y_pred)
 print(f"Test Set Accuracy: {accuracy:.4f}")
 print(f"Test Set ROC-AUC Score: {roc_auc:.4f}")
@@ -137,15 +130,12 @@ for train_idx, val_idx in cv.split(X_train_balanced, y_train_balanced):
 
     best_logistic_model.fit(X_cv_train, y_cv_train)
     
-    # Loss (1 - Accuracy)
     train_losses.append(1 - best_logistic_model.score(X_cv_train, y_cv_train))
     val_losses.append(1 - best_logistic_model.score(X_cv_val, y_cv_val))
     
-    # Accuracy
     train_accuracies.append(best_logistic_model.score(X_cv_train, y_cv_train))
     val_accuracies.append(best_logistic_model.score(X_cv_val, y_cv_val))
 
-# Plot Loss Graph
 plt.figure(figsize=(10, 6))
 plt.plot(range(1, len(train_losses)+1), train_losses, marker='o', label='Training Loss')
 plt.plot(range(1, len(val_losses)+1), val_losses, marker='o', label='Validation Loss')
@@ -157,7 +147,6 @@ plt.tight_layout()
 plt.savefig(os.path.join(output_folder, "loss_progression.png"))
 plt.show()
 
-# Plot Accuracy Graph
 plt.figure(figsize=(10, 6))
 plt.plot(range(1, len(train_accuracies)+1), train_accuracies, marker='o', label='Training Accuracy')
 plt.plot(range(1, len(val_accuracies)+1), val_accuracies, marker='o', label='Validation Accuracy')

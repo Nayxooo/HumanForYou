@@ -1,4 +1,3 @@
-# Required Libraries
 import pandas as pd
 import numpy as np
 import os
@@ -26,7 +25,6 @@ out_time = pd.read_csv("out_time.csv")
 # ============================
 print("Merging datasets...")
 
-# Ensure all employees in general_data are retained
 data = general_data.merge(manager_data, on="EmployeeID", how="left")
 data = data.merge(employee_data, on="EmployeeID", how="left")
 
@@ -35,13 +33,11 @@ data = data.merge(employee_data, on="EmployeeID", how="left")
 # ============================
 print("Handling missing values...")
 
-# Fill missing values for numerical columns with median
 for col in data.select_dtypes(include=[np.number]).columns:
     if data[col].isnull().sum() > 0:
         print(f"Filling missing values in {col} with median...")
         data[col].fillna(data[col].median(), inplace=True)
 
-# Fill missing values for categorical columns with mode
 for col in data.select_dtypes(include=[object]).columns:
     if data[col].isnull().sum() > 0:
         print(f"Filling missing values in {col} with mode...")
@@ -61,7 +57,6 @@ def remove_outliers(df, col):
     print(f"Removing outliers in {col}...")
     return df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
 
-# Exclude unwanted columns from outlier removal
 numerical_cols = data.select_dtypes(include=[np.number]).columns
 numerical_cols = [col for col in numerical_cols if col not in ['EmployeeCount', 'EmployeeID', 'StandardHours']]
 
@@ -73,17 +68,15 @@ for col in numerical_cols:
 # ============================
 print("Aggregating in/out time data...")
 
-# Clean up in_time and out_time datasets
 in_time_clean = in_time.dropna(axis=1, how='all')
 out_time_clean = out_time.dropna(axis=1, how='all')
 
-# Parse datetime and calculate average working hours
 for col in in_time_clean.columns[1:]:
     in_time_clean[col] = pd.to_datetime(in_time_clean[col], errors='coerce')
     out_time_clean[col] = pd.to_datetime(out_time_clean[col], errors='coerce')
 
 working_hours = (out_time_clean.iloc[:, 1:] - in_time_clean.iloc[:, 1:]).mean(axis=1).dt.total_seconds() / 3600
-working_hours = working_hours.fillna(0)  # Fill missing working hours with 0
+working_hours = working_hours.fillna(0)  
 data['AvgWorkHours'] = working_hours
 
 # ============================
@@ -93,7 +86,7 @@ print("Encoding categorical variables...")
 
 label_encoder = LabelEncoder()
 categorical_cols = data.select_dtypes(include=[object]).columns
-# Exclude unwanted columns from encoding
+
 categorical_cols = [col for col in categorical_cols if col not in ['Gender']]
 
 for col in categorical_cols:
@@ -109,13 +102,12 @@ data = pd.get_dummies(data, columns=categorical_cols, drop_first=True)
 print("Normalizing numerical data...")
 
 scaler = MinMaxScaler()
-# Exclude unwanted columns from scaling
+
 numerical_cols = data.select_dtypes(include=[np.number]).columns
 numerical_cols = [col for col in numerical_cols if col not in ['EmployeeCount', 'EmployeeID', 'StandardHours']]
 
 data[numerical_cols] = scaler.fit_transform(data[numerical_cols])
 
-# Log transform skewed columns
 for col in numerical_cols:
     if data[col].skew() > 1:
         print(f"Log-transforming skewed column: {col}")
